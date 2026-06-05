@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HosXP → Supabase Migration</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   TOKENS
+══════════════════════════════════════════ */
+:root {
+  --bg0:     #060b14;
+  --bg1:     #0d1424;
+  --bg2:     #111d33;
+  --bg3:     #172240;
+  --line:    #1e2f4d;
+  --line2:   #253a5e;
+
+  --blue:    #3b82f6;
+  --blue2:   #60a5fa;
+  --cyan:    #06b6d4;
+  --green:   #10b981;
+  --amber:   #f59e0b;
+  --red:     #ef4444;
+  --violet:  #8b5cf6;
+
+  --text:    #cdd9f0;
+  --muted:   #4d6589;
+  --dim:     #2d4166;
+
+  --font:    'Noto Sans Thai', sans-serif;
+  --mono:    'JetBrains Mono', monospace;
+
+  --r:       10px;
+  --r-sm:    6px;
+  --shadow:  0 4px 24px rgba(0,0,0,.5);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg0);
+  color:var(--text);
+  min-height:100vh;
+  /* subtle grid texture */
+  background-image:
+    linear-gradient(rgba(59,130,246,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(59,130,246,.03) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+
+/* ══════════════════════════════════════════
+   TOPBAR
+══════════════════════════════════════════ */
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:rgba(6,11,20,.85);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  height:56px;
+  display:flex;align-items:center;
+  padding:0 1.5rem;gap:1rem;
+}
+.logo{
+  display:flex;align-items:center;gap:.6rem;
+  font-size:1rem;font-weight:700;color:#fff;
+  letter-spacing:-.01em;
+}
+.logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:grid;place-items:center;font-size:1rem;
+}
+.logo .arr{color:var(--cyan);margin:0 2px}
+.topbar-steps{
+  margin-left:auto;display:flex;gap:4px;
+}
+.step-btn{
+  padding:5px 14px;border-radius:20px;
+  font-family:var(--font);font-size:.78rem;font-weight:500;
+  background:transparent;border:1px solid var(--line);
+  color:var(--muted);cursor:pointer;transition:all .2s;
+}
+.step-btn.active{
+  background:rgba(59,130,246,.15);
+  border-color:var(--blue);color:var(--blue2);
+}
+.step-btn:hover:not(.active){border-color:var(--line2);color:var(--text)}
+
+/* ══════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════ */
+.wrap{
+  max-width:1280px;margin:0 auto;
+  padding:1.5rem;
+  display:grid;
+  grid-template-columns:340px 1fr;
+  gap:1.25rem;
+  align-items:start;
+}
+
+/* ══════════════════════════════════════════
+   PANEL (card)
+══════════════════════════════════════════ */
+.panel{
+  background:var(--bg1);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+.panel-head{
+  padding:.75rem 1.1rem;
+  background:var(--bg2);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.panel-head h3{
+  font-size:.82rem;font-weight:600;
+  display:flex;align-items:center;gap:7px;
+  color:var(--text);
+}
+.panel-head h3 .icon{
+  width:22px;height:22px;border-radius:5px;
+  display:grid;place-items:center;font-size:.85rem;
+  background:rgba(59,130,246,.15);
+}
+.panel-body{padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.8rem}
+
+/* ══════════════════════════════════════════
+   FORM CONTROLS
+══════════════════════════════════════════ */
+.fg{display:flex;flex-direction:column;gap:.3rem}
+.fg label{font-size:.72rem;color:var(--muted);font-weight:500;letter-spacing:.03em}
+.fg input,.fg select{
+  width:100%;
+  background:var(--bg2);
+  border:1px solid var(--line);
+  color:var(--text);
+  font-family:var(--font);font-size:.83rem;
+  padding:7px 10px;border-radius:var(--r-sm);
+  outline:none;transition:border-color .2s;
+  appearance:none;
+}
+.fg input:focus,.fg select:focus{border-color:var(--blue)}
+.fg select option{background:var(--bg2)}
+.fg input::placeholder{color:var(--dim)}
+
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.6rem}
+
+/* ══════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:8px 16px;border-radius:var(--r-sm);
+  font-family:var(--font);font-size:.83rem;font-weight:600;
+  border:none;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#2563eb;transform:translateY(-1px)}
+.btn-primary:disabled{background:var(--dim);cursor:not-allowed;transform:none}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:#059669}
+.btn-success:disabled{background:var(--dim);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--line2);color:var(--text)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.25)}
+.btn-sm{padding:5px 10px;font-size:.75rem}
+.btn-full{width:100%}
+
+/* ══════════════════════════════════════════
+   SECTION TABS (date mode)
+══════════════════════════════════════════ */
+.mode-tabs{
+  display:flex;border-radius:var(--r-sm);
+  border:1px solid var(--line);overflow:hidden;
+}
+.mode-tab{
+  flex:1;padding:7px;text-align:center;
+  font-size:.75rem;font-weight:600;cursor:pointer;
+  background:var(--bg2);color:var(--muted);
+  border:none;font-family:var(--font);
+  transition:all .2s;
+}
+.mode-tab.active{background:rgba(59,130,246,.2);color:var(--blue2)}
+.mode-tab:hover:not(.active){color:var(--text)}
+
+/* ══════════════════════════════════════════
+   STATUS BADGE
+══════════════════════════════════════════ */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.7rem;padding:2px 8px;border-radius:20px;font-weight:600;
+}
+.badge-ok{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+.badge-err{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.badge-idle{background:var(--bg3);color:var(--muted);border:1px solid var(--line)}
+.badge-running{background:rgba(245,158,11,.15);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+.dot{width:6px;height:6px;border-radius:50%}
+.dot-green{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-red{background:var(--red)}
+.dot-amber{background:var(--amber);animation:pulse .8s ease infinite alternate}
+.dot-muted{background:var(--muted)}
+@keyframes pulse{to{opacity:.3}}
+
+/* ══════════════════════════════════════════
+   CONNECTION STATUS
+══════════════════════════════════════════ */
+.conn-status{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;border-radius:var(--r-sm);
+  background:var(--bg3);border:1px solid var(--line);
+  font-size:.75rem;
+}
+.conn-status .label{flex:1;color:var(--muted)}
+.conn-status .val{font-family:var(--mono);font-size:.72rem}
+
+/* ══════════════════════════════════════════
+   TABLE SELECTOR
+══════════════════════════════════════════ */
+.tbl-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:4px;
+  max-height:240px;overflow-y:auto;
+  padding:6px;background:var(--bg2);border:1px solid var(--line);
+  border-radius:var(--r-sm);
+}
+.tbl-item{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 7px;border-radius:5px;cursor:pointer;
+  transition:background .15s;
+  user-select:none;
+}
+.tbl-item:hover{background:var(--bg3)}
+.tbl-item input[type=checkbox]{
+  width:14px;height:14px;
+  accent-color:var(--blue);cursor:pointer;
+}
+.tbl-item .tname{
+  font-size:.75rem;font-family:var(--mono);color:var(--text);
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.tbl-item .tcount{
+  font-size:.68rem;font-family:var(--mono);
+  color:var(--muted);white-space:nowrap;
+}
+.tbl-item.has-filter .tname{color:var(--cyan)}
+
+.tbl-toolbar{
+  display:flex;gap:6px;justify-content:space-between;align-items:center;
+}
+.tbl-toolbar .info{font-size:.72rem;color:var(--muted)}
+
+/* ══════════════════════════════════════════
+   PROGRESS + STATS
+══════════════════════════════════════════ */
+.stat-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;
+}
+.stat-box{
+  background:var(--bg2);border:1px solid var(--line);
+  border-radius:var(--r-sm);padding:.65rem .8rem;
+  position:relative;overflow:hidden;
+}
+.stat-box::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+}
+.stat-box.s-blue::after{background:var(--blue)}
+.stat-box.s-green::after{background:var(--green)}
+.stat-box.s-red::after{background:var(--red)}
+.stat-box.s-cyan::after{background:var(--cyan)}
+.stat-box .sv{
+  font-size:1.4rem;font-weight:700;font-family:var(--mono);
+  line-height:1;margin-bottom:3px;
+}
+.stat-box.s-blue .sv{color:var(--blue2)}
+.stat-box.s-green .sv{color:var(--green)}
+.stat-box.s-red .sv{color:var(--red)}
+.stat-box.s-cyan .sv{color:var(--cyan)}
+.stat-box .sk{font-size:.68rem;color:var(--muted)}
+
+.prog-wrap{
+  background:var(--bg3);border-radius:20px;height:8px;overflow:hidden;
+}
+.prog-bar{
+  height:100%;border-radius:20px;
+  background:linear-gradient(90deg,var(--blue),var(--cyan));
+  transition:width .4s ease;
+  position:relative;overflow:hidden;
+}
+.prog-bar::after{
+  content:'';
+  position:absolute;top:0;left:-100%;right:0;bottom:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent);
+  animation:shimmer 1.5s infinite;
+}
+@keyframes shimmer{to{left:200%}}
+.prog-info{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.72rem;color:var(--muted);margin-top:4px;
+}
+.prog-info .cur{color:var(--text);font-family:var(--mono)}
+
+/* ══════════════════════════════════════════
+   LOG CONSOLE
+══════════════════════════════════════════ */
+.log-wrap{
+  background:#020810;border:1px solid var(--line);
+  border-radius:var(--r-sm);
+  font-family:var(--mono);font-size:.75rem;
+  height:300px;overflow-y:auto;padding:.6rem .8rem;
+  display:flex;flex-direction:column;gap:1px;
+}
+.log-line{line-height:1.5;word-break:break-all}
+.log-ts{color:var(--dim)}
+.l-ok{color:var(--green)}
+.l-err{color:var(--red)}
+.l-warn{color:var(--amber)}
+.l-info{color:var(--text)}
+.l-dim{color:var(--muted)}
+.log-empty{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  color:var(--dim);font-size:.8rem;
+}
+
+/* ══════════════════════════════════════════
+   PREVIEW TABLE
+══════════════════════════════════════════ */
+.preview-wrap{
+  overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-sm);
+}
+.preview-wrap table{
+  width:100%;border-collapse:collapse;font-size:.75rem;
+}
+.preview-wrap thead tr{
+  background:var(--bg3);border-bottom:2px solid var(--blue);
+}
+.preview-wrap thead th{
+  padding:8px 10px;text-align:left;
+  color:var(--muted);font-size:.68rem;
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;
+  font-weight:600;
+}
+.preview-wrap tbody tr{border-bottom:1px solid var(--line)}
+.preview-wrap tbody tr:hover{background:rgba(59,130,246,.04)}
+.preview-wrap tbody td{
+  padding:7px 10px;color:var(--text);
+}
+.c-mono{font-family:var(--mono);font-size:.72rem}
+.c-num{text-align:right;font-family:var(--mono)}
+.c-pill{
+  display:inline-block;padding:1px 7px;border-radius:20px;
+  font-size:.68rem;font-weight:600;font-family:var(--mono);
+}
+.cp-blue{background:rgba(59,130,246,.15);color:var(--blue2)}
+.cp-cyan{background:rgba(6,182,212,.15);color:var(--cyan)}
+
+/* ══════════════════════════════════════════
+   DIVIDER
+══════════════════════════════════════════ */
+.divider{border:none;border-top:1px solid var(--line);margin:.2rem 0}
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;
+  display:flex;flex-direction:column;gap:8px;
+}
+.toast-item{
+  padding:10px 16px;border-radius:var(--r-sm);
+  font-size:.82rem;font-weight:500;
+  box-shadow:var(--shadow);animation:toastIn .3s ease;
+  display:flex;align-items:center;gap:8px;max-width:340px;
+}
+.toast-ok{background:#064e3b;border:1px solid var(--green);color:var(--green)}
+.toast-err{background:#450a0a;border:1px solid var(--red);color:#fca5a5}
+.toast-info{background:var(--bg3);border:1px solid var(--line);color:var(--text)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}}
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ══════════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════════ */
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.panel{animation:fadeUp .35s ease both}
+.panel:nth-child(2){animation-delay:.06s}
+.panel:nth-child(3){animation-delay:.12s}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">⚕️</div>
+    <span>HosXP</span>
+    <span class="arr">→</span>
+    <span style="color:var(--cyan)">Supabase</span>
+  </div>
+  <span style="font-size:.72rem;color:var(--muted);font-family:var(--mono)">Migration Tool v3</span>
+  <div class="topbar-steps">
+    <button class="step-btn active" onclick="goto(0)">① เชื่อมต่อ</button>
+    <button class="step-btn" onclick="goto(1)">② เงื่อนไข</button>
+    <button class="step-btn" onclick="goto(2)">③ นำเข้า</button>
+  </div>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="wrap">
+
+  <!-- ══════════════ LEFT COLUMN ══════════════ -->
+  <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+    <!-- ① MySQL Config -->
+    <div class="panel" id="sec-mysql">
+      <div class="panel-head">
+        <h3><span class="icon">🗄</span> MySQL — HosXP</h3>
+        <div class="badge badge-idle" id="src-badge">
+          <span class="dot dot-muted"></span> ยังไม่ได้ทดสอบ
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="row2">
+          <div class="fg">
+            <label>HOST / IP</label>
+            <input id="src_host" value="192.168.0.200" placeholder="192.168.x.x">
+          </div>
+          <div class="fg">
+            <label>PORT</label>
+            <input id="src_port" value="3306" type="number">
+          </div>
+        </div>
+        <div class="fg">
+          <label>DATABASE</label>
+          <input id="src_db" value="hos_14062" placeholder="hos_xxxxx">
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label>USER</label>
+            <input id="src_user" value="sa">
+          </div>
+          <div class="fg">
+            <label>PASSWORD</label>
+            <input id="src_pass" type="password" placeholder="••••••">
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-full btn-sm" id="btn-test-src" onclick="testSrc()">
+          🔌 ทดสอบการเชื่อมต่อ MySQL
+        </button>
+        <div class="conn-status" id="src-status" style="display:none">
+          <div class="label" id="src-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② Supabase Config -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3><span class="icon">☁</span> Supabase</h3>
+        <div class="badge badge-idle" id="dst-badge">
+          <span class="dot dot-muted"></span> ยังไม่ได้ทดสอบ
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="fg">
+          <label>HOST (Pooler)</label>
+          <input id="db_host" placeholder="aws-1-ap-southeast-1.pooler.supabase.com">
+        </div>
+        <div class="row3">
+          <div class="fg">
+            <label>PORT</label>
+            <input id="db_port" value="5432" type="number">
+          </div>
+          <div class="fg" style="grid-column:span 2">
+            <label>DATABASE</label>
+            <input id="db_name" value="postgres">
+          </div>
+        </div>
+        <div class="fg">
+          <label>USER</label>
+          <input id="db_user" placeholder="postgres.xxxxxxxxxxxxxxxx">
+        </div>
+        <div class="fg">
+          <label>PASSWORD</label>
+          <input id="db_pass" type="password" placeholder="••••••••••••••••">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" style="flex:1" id="btn-test-dst" onclick="testDst()">
+            🔌 ทดสอบ Supabase
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="saveConfig()">💾 บันทึก</button>
+        </div>
+        <div class="conn-status" id="dst-status" style="display:none">
+          <div class="label" id="dst-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ Options -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3><span class="icon">⚙</span> ตัวเลือก</h3>
+      </div>
+      <div class="panel-body">
+        <div class="row2">
+          <div class="fg">
+            <label>BATCH SIZE</label>
+            <select id="opt_batch">
+              <option value="100">100 แถว</option>
+              <option value="500" selected>500 แถว</option>
+              <option value="1000">1,000 แถว</option>
+              <option value="2000">2,000 แถว</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>TRUNCATE ก่อนนำเข้า</label>
+            <select id="opt_truncate">
+              <option value="true" selected>ใช่ (ลบข้อมูลเก่า)</option>
+              <option value="false">ไม่ (เพิ่มต่อ)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- ══════════════ RIGHT COLUMN ══════════════ -->
+  <div style="display:flex;flex-direction:column;gap:1.25rem">
+
+    <!-- ④ DATE CONDITION -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3><span class="icon">📅</span> เงื่อนไขวันที่รับบริการ</h3>
+        <div class="badge badge-idle" id="date-badge"><span class="dot dot-muted"></span> ยังไม่เลือก</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Mode selector -->
+        <div class="mode-tabs">
+          <button class="mode-tab active" onclick="setMode('month')" id="mt-month">📆 เดือน/ปี ไทย</button>
+          <button class="mode-tab" onclick="setMode('range')" id="mt-range">📅 ระหว่างวันที่</button>
+          <button class="mode-tab" onclick="setMode('all')"   id="mt-all">📋 ทั้งหมด</button>
+        </div>
+
+        <!-- Month mode -->
+        <div id="mode-month">
+          <div class="row2">
+            <div class="fg">
+              <label>ปี พ.ศ.</label>
+              <select id="sel_year">
+                <option value="2569" selected>2569</option>
+                <option value="2568">2568</option>
+                <option value="2567">2567</option>
+                <option value="2566">2566</option>
+                <option value="2565">2565</option>
+                <option value="2564">2564</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>เดือน</label>
+              <select id="sel_month">
+                <option value="1">มกราคม</option>
+                <option value="2">กุมภาพันธ์</option>
+                <option value="3">มีนาคม</option>
+                <option value="4">เมษายน</option>
+                <option value="5">พฤษภาคม</option>
+                <option value="6" selected>มิถุนายน</option>
+                <option value="7">กรกฎาคม</option>
+                <option value="8">สิงหาคม</option>
+                <option value="9">กันยายน</option>
+                <option value="10">ตุลาคม</option>
+                <option value="11">พฤศจิกายน</option>
+                <option value="12">ธันวาคม</option>
+              </select>
+            </div>
+          </div>
+          <div style="font-size:.72rem;color:var(--muted);padding:4px 2px" id="month-hint"></div>
+        </div>
+
+        <!-- Range mode -->
+        <div id="mode-range" style="display:none">
+          <div class="row2">
+            <div class="fg">
+              <label>ตั้งแต่วันที่ (ปี พ.ศ.)</label>
+              <input id="date_from" type="text" placeholder="2569-06-01">
+            </div>
+            <div class="fg">
+              <label>ถึงวันที่ (ปี พ.ศ.)</label>
+              <input id="date_to" type="text" placeholder="2569-06-30">
+            </div>
+          </div>
+          <div style="font-size:.72rem;color:var(--muted);padding:4px 2px">
+            ใส่วันที่แบบ ปพ.ศ.-เดือน-วัน เช่น 2569-01-01 ระบบจะแปลงให้อัตโนมัติ
+          </div>
+        </div>
+
+        <!-- All mode -->
+        <div id="mode-all" style="display:none">
+          <div style="
+            padding:12px;background:rgba(245,158,11,.08);
+            border:1px solid rgba(245,158,11,.25);border-radius:var(--r-sm);
+            font-size:.8rem;color:var(--amber);
+          ">
+            ⚠️ <strong>นำเข้าข้อมูลทั้งหมด</strong> จาก HosXP โดยไม่กรองวันที่<br>
+            <span style="font-size:.72rem;color:var(--muted)">อาจใช้เวลานานมากหากมีข้อมูลจำนวนมาก</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ⑤ TABLE SELECTOR -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3><span class="icon">📋</span> ตารางที่ต้องการนำเข้า</h3>
+        <span id="sel-count" style="font-size:.72rem;color:var(--muted);font-family:var(--mono)">0/17</span>
+      </div>
+      <div class="panel-body">
+        <div class="tbl-toolbar">
+          <div class="info" id="count-hint">ตารางสีฟ้า = มี date filter | สีขาว = นำเข้าทั้งตาราง</div>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick="selAll(true)">เลือกทั้งหมด</button>
+            <button class="btn btn-ghost btn-sm" onclick="selAll(false)">ล้าง</button>
+            <button class="btn btn-ghost btn-sm" onclick="previewCount()">🔍 นับแถว</button>
+          </div>
+        </div>
+        <div class="tbl-grid" id="tbl-grid"></div>
+      </div>
+    </div>
+
+    <!-- ⑥ MIGRATE CONTROLS -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3><span class="icon">🚀</span> นำเข้าข้อมูล</h3>
+        <div class="badge badge-idle" id="run-badge"><span class="dot dot-muted"></span> พร้อม</div>
+      </div>
+      <div class="panel-body">
+
+        <!-- Stats -->
+        <div class="stat-grid">
+          <div class="stat-box s-blue">
+            <div class="sv" id="st-total">0</div>
+            <div class="sk">แถวทั้งหมด</div>
+          </div>
+          <div class="stat-box s-green">
+            <div class="sv" id="st-success">0</div>
+            <div class="sk">สำเร็จ</div>
+          </div>
+          <div class="stat-box s-red">
+            <div class="sv" id="st-error">0</div>
+            <div class="sk">ผิดพลาด</div>
+          </div>
+          <div class="stat-box s-cyan">
+            <div class="sv" id="st-pct">0%</div>
+            <div class="sk">คืบหน้า</div>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div>
+          <div class="prog-wrap">
+            <div class="prog-bar" id="prog-bar" style="width:0%"></div>
+          </div>
+          <div class="prog-info">
+            <span id="prog-table" class="cur">—</span>
+            <span id="prog-pct">0%</span>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" style="flex:1" id="btn-start" onclick="startMigrate()">
+            ▶ เริ่มนำเข้า
+          </button>
+          <button class="btn btn-danger" id="btn-stop" onclick="stopMigrate()" disabled>
+            ⏹ หยุด
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="clearLog()">🗑 ล้าง log</button>
+        </div>
+
+        <!-- Log -->
+        <div class="log-wrap" id="log-box">
+          <div class="log-empty">log จะแสดงที่นี่เมื่อเริ่มนำเข้า</div>
+        </div>
+
+      </div>
+    </div>
+
+  
+<!-- ── Upload 14062.txt card ─────────────────────────────── -->
+<div class="card" id="card-upload14062" style="margin-top:12px">
+  <div class="card-header">
+    <span>📁 นำเข้าไฟล์ income_14062.txt</span>
+    <span class="badge badge-ok" id="upload14062-status" style="display:none">✅ นำเข้าแล้ว</span>
+  </div>
+  <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:12px;opacity:.65">
+      รองรับไฟล์รูปแบบ <code>*| A 01, seq, hospcode, ...</code> — นำเข้าตาราง <b>income_14062</b> อัตโนมัติ
+    </div>
+    <input type="file" id="file14062" accept=".txt"
+      style="font-size:13px;padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--fg)">
+    <button class="btn btn-success btn-sm" onclick="uploadIncome14062()" id="btn-upload14062">
+      ▶ นำเข้าไฟล์นี้
+    </button>
+    <div id="upload14062-result" style="font-size:12px;display:none"></div>
+  </div>
+</div>
+</div><!-- /right -->
+</div><!-- /wrap -->
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG & STATE
+// ══════════════════════════════════════════
+const HOSXP_TABLES = [
+  {name:"ovst",        dateFilter:true},
+  {name:"opitemrece",  dateFilter:true},
+  {name:"opdscreen",   dateFilter:true},
+  {name:"ovstdiag",    dateFilter:true},
+  {name:"opi_dispense",dateFilter:false},
+  {name:"visit_pttype",dateFilter:false},
+  {name:"patient",     dateFilter:false},
+  {name:"pttype",      dateFilter:false},
+  {name:"hospcode",    dateFilter:false},
+  {name:"thaiaddress", dateFilter:false},
+  {name:"icd101",      dateFilter:false},
+  {name:"doctor",      dateFilter:false},
+  {name:"income",      dateFilter:false},
+  {name:"nondrugitems",dateFilter:false},
+  {name:"drugitems",   dateFilter:false},
+  {name:"found_allergy_type",dateFilter:false},
+  {name:"drugusage",   dateFilter:false},
+  {name:"opdconfig",   dateFilter:false},
+];
+
+let mode = 'month';
+let ws   = null;
+let running = false;
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.onload = async () => {
+  buildTableGrid();
+  await loadConfig();
+  updateMonthHint();
+};
+
+// ══════════════════════════════════════════
+//  CONFIG PERSISTENCE
+// ══════════════════════════════════════════
+const CFG_KEY = 'hosxp_mig_cfg';
+function saveConfig() {
+  const c = getConfig();
+  localStorage.setItem(CFG_KEY, JSON.stringify(c));
+  toast('💾 บันทึกแล้ว', 'ok');
+}
+
+function applyConfig(c) {
+  const fields = ['src_host','src_port','src_db','src_user','src_pass',
+                  'db_host','db_port','db_name','db_user','db_pass'];
+  fields.forEach(f => { if (c[f] !== undefined) document.getElementById(f).value = c[f]; });
+  if (c.batch_size) document.getElementById('opt_batch').value = c.batch_size;
+  if (c.truncate_before !== undefined) document.getElementById('opt_truncate').value = String(c.truncate_before);
+  if (c.truncate !== undefined) document.getElementById('opt_truncate').value = c.truncate;
+  if (c.selected_tables) {
+    // ตารางที่เพิ่มใหม่ (ไม่อยู่ใน config เดิม) → ติ้กถูกไว้เสมอ
+    const alwaysChecked = ['opdconfig','income_14062'];
+    HOSXP_TABLES.forEach(t => {
+      const cb = document.getElementById('cb_'+t.name);
+      if (!cb) return;
+      cb.checked = alwaysChecked.includes(t.name) || c.selected_tables.includes(t.name);
+    });
+    updateSelCount();
+  }
+}
+
+async function loadConfig() {
+  // 1) ลองโหลดจากไฟล์ hosxp_migrate_config.json ก่อน
+  try {
+    const r = await fetch('/api/config');
+    const j = await r.json();
+    if (j.ok && j.config) {
+      applyConfig(j.config);
+      toast('📂 โหลดค่าจาก hosxp_migrate_config.json แล้ว', 'ok');
+      return;
+    }
+  } catch(e) {}
+  // 2) fallback → localStorage
+  try {
+    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (Object.keys(c).length) applyConfig(c);
+  } catch(e) {}
+}
+function getConfig() {
+  return {
+    src_host: v('src_host'), src_port: v('src_port'),
+    src_db: v('src_db'),     src_user: v('src_user'), src_pass: v('src_pass'),
+    db_host: v('db_host'),   db_port: v('db_port'),
+    db_name: v('db_name'),   db_user: v('db_user'),   db_pass: v('db_pass'),
+    batch_size: v('opt_batch'), truncate: v('opt_truncate'),
+    selected_tables: getSelTables(),
+  };
+}
+const v = id => document.getElementById(id)?.value?.trim() || '';
+
+// ══════════════════════════════════════════
+//  TABLE GRID
+// ══════════════════════════════════════════
+function buildTableGrid() {
+  const grid = document.getElementById('tbl-grid');
+  grid.innerHTML = '';
+  HOSXP_TABLES.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'tbl-item' + (t.dateFilter ? ' has-filter' : '');
+    div.innerHTML = `
+      <input type="checkbox" id="cb_${t.name}" checked onchange="updateSelCount()">
+      <label class="tname" for="cb_${t.name}" title="${t.name}">${t.name}</label>
+      <span class="tcount" id="cnt_${t.name}">—</span>`;
+    grid.appendChild(div);
+  });
+  updateSelCount();
+}
+
+function updateSelCount() {
+  const sel = getSelTables();
+  document.getElementById('sel-count').textContent = `${sel.length}/${HOSXP_TABLES.length}`;
+}
+function getSelTables() {
+  return HOSXP_TABLES.filter(t => document.getElementById('cb_'+t.name)?.checked).map(t=>t.name);
+}
+function selAll(v) {
+  HOSXP_TABLES.forEach(t => { document.getElementById('cb_'+t.name).checked = v; });
+  updateSelCount();
+}
+
+// ══════════════════════════════════════════
+//  DATE MODE
+// ══════════════════════════════════════════
+const MONTHS_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                   'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+function setMode(m) {
+  mode = m;
+  ['month','range','all'].forEach(x => {
+    document.getElementById('mode-'+x).style.display  = x===m ? '' : 'none';
+    document.getElementById('mt-'+x).classList.toggle('active', x===m);
+  });
+  updateDateBadge();
+}
+
+function updateMonthHint() {
+  const y = parseInt(v('sel_year'));
+  const m = parseInt(v('sel_month') || document.getElementById('sel_month').value);
+  const yg = y - 543;
+  const lastDay = new Date(yg, m, 0).getDate();
+  document.getElementById('month-hint').textContent =
+    `→ กรองวันที่ ${y}-${String(m).padStart(2,'0')}-01 ถึง ${y}-${String(m).padStart(2,'0')}-${lastDay}`;
+  updateDateBadge();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('sel_year').addEventListener('change', updateMonthHint);
+  document.getElementById('sel_month').addEventListener('change', updateMonthHint);
+});
+
+function updateDateBadge() {
+  const b = document.getElementById('date-badge');
+  if (mode === 'month') {
+    const y = v('sel_year'), m = document.getElementById('sel_month').selectedOptions[0]?.text;
+    b.innerHTML = `<span class="dot dot-green"></span> ${MONTHS_TH[parseInt(v('sel_month'))]} ${y}`;
+    b.className = 'badge badge-ok';
+  } else if (mode === 'range') {
+    b.innerHTML = `<span class="dot dot-green"></span> ${v('date_from')} → ${v('date_to')}`;
+    b.className = 'badge badge-ok';
+  } else {
+    b.innerHTML = `<span class="dot dot-amber"></span> ทั้งหมด`;
+    b.className = 'badge badge-running';
+  }
+}
+
+// ══════════════════════════════════════════
+//  TEST CONNECTIONS
+// ══════════════════════════════════════════
+async function testSrc() {
+  setBadge('src', 'running', '🔄 กำลังทดสอบ...');
+  document.getElementById('src-status').style.display='none';
+  try {
+    const r = await post('/api/test-src', srcConfig());
+    setBadge('src', 'ok', '✅ เชื่อมต่อสำเร็จ');
+    showStatus('src', r.message, true);
+    // populate table counts hint
+    toast(r.message, 'ok');
+  } catch(e) {
+    setBadge('src', 'err', '❌ ล้มเหลว');
+    showStatus('src', e, false);
+    toast(e, 'err');
+  }
+}
+
+async function testDst() {
+  setBadge('dst', 'running', '🔄 กำลังทดสอบ...');
+  document.getElementById('dst-status').style.display='none';
+  try {
+    const r = await post('/api/test-dst', dstConfig());
+    setBadge('dst', 'ok', '✅ เชื่อมต่อสำเร็จ');
+    showStatus('dst', r.message, true);
+    toast(r.message, 'ok');
+  } catch(e) {
+    setBadge('dst', 'err', '❌ ล้มเหลว');
+    showStatus('dst', e, false);
+    toast(e, 'err');
+  }
+}
+
+function showStatus(id, msg, ok) {
+  const el = document.getElementById(id+'-status');
+  el.style.display = 'flex';
+  document.getElementById(id+'-msg').textContent = msg;
+  el.style.borderColor = ok ? 'rgba(16,185,129,.3)' : 'rgba(239,68,68,.3)';
+  document.getElementById(id+'-msg').style.color = ok ? 'var(--green)' : 'var(--red)';
+}
+
+// ══════════════════════════════════════════
+//  PREVIEW COUNT
+// ══════════════════════════════════════════
+async function previewCount() {
+  try {
+    toast('🔍 กำลังนับแถว...', 'info');
+    const r = await post('/api/preview-count', buildRequest());
+    Object.entries(r.counts).forEach(([t, n]) => {
+      const el = document.getElementById('cnt_'+t);
+      if (el) el.textContent = n >= 0 ? n.toLocaleString() : 'N/A';
+    });
+    toast(`รวม ${r.total?.toLocaleString()} แถว`, 'ok');
+  } catch(e) {
+    toast('ไม่สามารถนับแถวได้: '+e, 'err');
+  }
+}
+
+// ══════════════════════════════════════════
+//  MIGRATE via WebSocket
+// ══════════════════════════════════════════
+function startMigrate() {
+  if (running) return;
+  const tables = getSelTables();
+  if (!tables.length) { toast('กรุณาเลือกตารางอย่างน้อย 1 ตาราง', 'err'); return; }
+
+  clearLog();
+  running = true;
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-stop').disabled  = false;
+  setBadge('run', 'running', '⚡ กำลังนำเข้า...');
+
+  const req = buildRequest();
+  const wsUrl = `ws://${location.host}/ws/migrate`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify(req));
+    appendLog('info', `🚀 เริ่มนำเข้า ${tables.length} ตาราง`);
+  };
+
+  ws.onmessage = ({data}) => {
+    const msg = JSON.parse(data);
+    switch (msg.type) {
+      case 'log':
+        appendLog(msg.level || 'info', msg.msg); break;
+      case 'stats':
+        document.getElementById('st-total').textContent   = (msg.total||0).toLocaleString();
+        document.getElementById('st-success').textContent = (msg.success||0).toLocaleString();
+        document.getElementById('st-error').textContent   = (msg.errors||0).toLocaleString();
+        break;
+      case 'progress':
+        setProgress(msg.pct, msg.table); break;
+      case 'done':
+        onDone(msg); break;
+      case 'error':
+        appendLog('err', '❌ '+msg.msg);
+        onDone({success:0, errors:1, total:0}); break;
+    }
+  };
+
+  ws.onerror = () => {
+    appendLog('err', '❌ WebSocket error — เซิร์ฟเวอร์อาจยังไม่พร้อม');
+    onDone({});
+  };
+  ws.onclose = () => { running = false; };
+}
+
+function stopMigrate() {
+  if (ws) ws.close();
+  running = false;
+  appendLog('warn', '⏹ หยุดโดยผู้ใช้');
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled  = true;
+  setBadge('run', 'idle', 'หยุดแล้ว');
+}
+
+function onDone(msg) {
+  running = false;
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-stop').disabled  = true;
+  setProgress(100, 'เสร็จสิ้น');
+  setBadge('run', 'ok', `✅ สำเร็จ ${(msg.success||0).toLocaleString()} แถว`);
+  toast(`🎉 เสร็จสิ้น! สำเร็จ ${(msg.success||0).toLocaleString()} แถว`, 'ok');
+  saveConfig();
+}
+
+// ══════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════
+function buildRequest() {
+  const cfg = {
+    src_host: v('src_host'), src_port: parseInt(v('src_port')||3306),
+    src_db:   v('src_db'),   src_user: v('src_user'), src_pass: v('src_pass'),
+    db_host:  v('db_host'),  db_port:  parseInt(v('db_port')||5432),
+    db_name:  v('db_name'),  db_user:  v('db_user'),  db_pass:  v('db_pass'),
+  };
+  return {
+    config: cfg,
+    mode,
+    year_th:    mode==='month' ? parseInt(v('sel_year')) : null,
+    month:      mode==='month' ? parseInt(document.getElementById('sel_month').value) : null,
+    date_from:  mode==='range' ? v('date_from') : null,
+    date_to:    mode==='range' ? v('date_to') : null,
+    selected_tables: getSelTables(),
+    truncate_before: v('opt_truncate') === 'true',
+    batch_size: parseInt(v('opt_batch')||500),
+  };
+}
+const srcConfig = () => ({
+  src_host:v('src_host'),src_port:parseInt(v('src_port')||3306),
+  src_db:v('src_db'),src_user:v('src_user'),src_pass:v('src_pass'),
+  db_host:'',db_port:5432,db_name:'',db_user:'',db_pass:'',
+});
+const dstConfig = () => ({
+  src_host:'',src_port:3306,src_db:'',src_user:'',src_pass:'',
+  db_host:v('db_host'),db_port:parseInt(v('db_port')||5432),
+  db_name:v('db_name'),db_user:v('db_user'),db_pass:v('db_pass'),
+});
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  });
+  const j = await r.json();
+  if (!r.ok) throw j.detail || JSON.stringify(j);
+  return j;
+}
+
+function setBadge(id, state, text) {
+  const el = document.getElementById(id+'-badge');
+  const dotClass = {ok:'dot-green', err:'dot-red', running:'dot-amber', idle:'dot-muted'}[state];
+  const badgeClass = {ok:'badge-ok', err:'badge-err', running:'badge-running', idle:'badge-idle'}[state];
+  el.className = `badge ${badgeClass}`;
+  el.innerHTML = `<span class="dot ${dotClass}"></span> ${text}`;
+}
+
+function setProgress(pct, table) {
+  document.getElementById('prog-bar').style.width  = pct + '%';
+  document.getElementById('prog-pct').textContent  = pct + '%';
+  document.getElementById('prog-table').textContent = table || '—';
+  document.getElementById('st-pct').textContent    = pct + '%';
+}
+
+function appendLog(level, msg) {
+  const box = document.getElementById('log-box');
+  const empty = box.querySelector('.log-empty');
+  if (empty) empty.remove();
+  const ts  = new Date().toLocaleTimeString('th-TH', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const cls = {ok:'l-ok', err:'l-err', warn:'l-warn', info:'l-info', dim:'l-dim'}[level] || 'l-info';
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.innerHTML = `<span class="log-ts">[${ts}]</span> ${escHtml(msg)}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+  const box = document.getElementById('log-box');
+  box.innerHTML = '<div class="log-empty">log จะแสดงที่นี่เมื่อเริ่มนำเข้า</div>';
+  ['st-total','st-success','st-error','st-pct'].forEach(id=>{
+    document.getElementById(id).textContent = id==='st-pct'?'0%':'0';
+  });
+  setProgress(0,'—');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── GOTO step highlight ──
+function goto(step) {
+  document.querySelectorAll('.step-btn').forEach((b,i)=>b.classList.toggle('active',i===step));
+  const sections = ['sec-mysql', null, null];
+  // just visual highlight
+}
+
+// ── TOAST ──
+function toast(msg, type='info') {
+  const box = document.getElementById('toast');
+  const el  = document.createElement('div');
+  el.className = `toast-item toast-${type}`;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(()=>el.remove(), 4000);
+}
+
+// ══ Bind live updates
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('sel_year')?.addEventListener('change', updateMonthHint);
+  document.getElementById('sel_month')?.addEventListener('change', updateMonthHint);
+  document.getElementById('date_from')?.addEventListener('input', updateDateBadge);
+  document.getElementById('date_to')?.addEventListener('input', updateDateBadge);
+  updateMonthHint();
+});
+
+// ── Upload income_14062.txt ───────────────────────────────────
+async function uploadIncome14062() {
+  const fileInput = document.getElementById('file14062');
+  if (!fileInput.files.length) { toast('กรุณาเลือกไฟล์ก่อน','err'); return; }
+  const cfg = getConfig();
+  if (!cfg.db_host) { toast('กรุณากรอก Supabase host ก่อน','err'); return; }
+
+  const btn = document.getElementById('btn-upload14062');
+  btn.disabled = true; btn.textContent = '⏳ กำลังนำเข้า...';
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('db_host', cfg.db_host);
+  fd.append('db_port', cfg.db_port || 5432);
+  fd.append('db_name', cfg.db_name || 'postgres');
+  fd.append('db_user', cfg.db_user);
+  fd.append('db_pass', cfg.db_pass);
+  fd.append('truncate_before', 'true');
+  fd.append('batch_size', cfg.batch_size || 500);
+
+  try {
+    const r = await fetch('/api/upload-income14062', { method:'POST', body:fd });
+    let j;
+    try { j = await r.json(); } catch(_) { j = { ok:false, msg: 'Server error (HTTP '+r.status+')' }; }
+    const el = document.getElementById('upload14062-result');
+    el.style.display = 'block';
+    if (j.ok) {
+      el.style.color = 'var(--ok)';
+      el.innerHTML = `✅ ${j.msg}<br>คอลัมน์: ${j.columns.join(', ')}`;
+      document.getElementById('upload14062-status').style.display = '';
+      toast(j.msg, 'ok');
+    } else {
+      const errMsg = j.detail || j.msg || 'เกิดข้อผิดพลาด';
+      el.style.color = 'var(--err)';
+      el.textContent = '❌ ' + errMsg;
+      toast('นำเข้าล้มเหลว: '+errMsg,'err');
+    }
+  } catch(e) {
+    toast('เชื่อมต่อ server ไม่ได้: '+e,'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ นำเข้าไฟล์นี้';
+  }
+}
+
+</script>
+</body>
+</html>
